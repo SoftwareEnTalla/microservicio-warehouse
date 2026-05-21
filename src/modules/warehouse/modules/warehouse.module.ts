@@ -63,11 +63,13 @@ import { WarehouseLoggingInterceptor } from "../interceptors/warehouse.logging.i
 
 //Event-Sourcing dependencies
 import { EventStoreService } from "../shared/event-store/event-store.service";
+import { StorageLocationModule } from "../../storage-location/modules/storagelocation.module";
 
 @Module({
   imports: [
     CqrsModule,
     KafkaModule,
+    StorageLocationModule,
     TypeOrmModule.forFeature([BaseEntity, Warehouse]), // Incluir BaseEntity para herencia
     CacheModule.registerAsync({
       useFactory: async () => {

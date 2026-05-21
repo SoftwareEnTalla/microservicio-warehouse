@@ -29,7 +29,7 @@
  */
 
 
-import { Injectable, Logger, NotFoundException, OnModuleInit } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleInit } from "@nestjs/common";
 import { DeleteResult, UpdateResult } from "typeorm";
 import { Warehouse } from "../entities/warehouse.entity";
 import { CreateWarehouseDto, UpdateWarehouseDto, DeleteWarehouseDto } from "../dtos/all-dto";
@@ -52,6 +52,7 @@ import { ModuleRef } from "@nestjs/core";
 import { WarehouseQueryService } from "./warehousequery.service";
 import { BaseEvent } from "../events/base.event";
 import { WarehouseCapacityUpdatedEvent } from '../events/warehousecapacityupdated.event';
+import { StorageLocationQueryRepository } from "../../storage-location/repositories/storagelocationquery.repository";
 
 @Injectable()
 export class WarehouseCommandService implements OnModuleInit {
@@ -61,6 +62,7 @@ export class WarehouseCommandService implements OnModuleInit {
   constructor(
     private readonly repository: WarehouseCommandRepository,
     private readonly queryRepository: WarehouseQueryRepository,
+    private readonly storageLocationQueryRepository: StorageLocationQueryRepository,
     private readonly commandBus: CommandBus,
     private readonly eventStore: EventStoreService,
     private readonly eventPublisher: KafkaEventPublisher,
@@ -118,6 +120,19 @@ export class WarehouseCommandService implements OnModuleInit {
 // No se definieron business-rules target=service.
     if (publishEvents) {
       await this.publishDslDomainEvents(pendingEvents);
+    }
+  }
+
+  private async assertWarehouseCanBeClosed(warehouseId: string): Promise<void> {
+    const [, activeStorageLocations] = await this.storageLocationQueryRepository.findAndCount({
+      warehouseId,
+      isActive: true,
+    });
+
+    if (activeStorageLocations > 0) {
+      throw new BadRequestException(
+        "No se puede cerrar o eliminar el warehouse mientras existan storage locations activas asociadas."
+      );
     }
   }
 
@@ -252,6 +267,12 @@ export class WarehouseCommandService implements OnModuleInit {
   ): Promise<WarehouseResponse<Warehouse>> {
     try {
       const currentEntity = await this.queryRepository.findById(id);
+      const isClosingWarehouse = currentEntity?.isActive !== false && partialEntity?.isActive === false;
+
+      if (isClosingWarehouse) {
+        await this.assertWarehouseCanBeClosed(id);
+      }
+
       const candidate = Object.assign(new Warehouse(), currentEntity ?? {}, partialEntity);
       await this.applyDslServiceRules("update", partialEntity as Record<string, any>, candidate, currentEntity, false);
       const entity = await this.repository.update(
@@ -354,6 +375,8 @@ export class WarehouseCommandService implements OnModuleInit {
       // Respuesta si el warehouse no existe
       if (!entity)
         throw new NotFoundException("Instancias de Warehouse no encontradas.");
+
+      await this.assertWarehouseCanBeClosed(id);
 
       await this.applyDslServiceRules("delete", { id }, entity, entity, false);
 
