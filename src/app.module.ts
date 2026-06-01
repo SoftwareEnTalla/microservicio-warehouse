@@ -53,6 +53,7 @@ import { HorizontalModule } from "@common/horizontal";
 import { StorageLocationModule } from "./modules/storage-location/modules/storagelocation.module";
 import { StorageLocationCommandService } from "./modules/storage-location/services/storagelocationcommand.service";
 import { StorageLocationQueryService } from "./modules/storage-location/services/storagelocationquery.service";
+import { WarehouseLifecycleModule } from "./modules/warehouse-lifecycle/warehouse-lifecycle.module";
 
 /*
 //TODO unused for while dependencies
@@ -118,7 +119,8 @@ import LoggerService, { logger } from "@core/logs/logger";
     HorizontalModule,
     WarehouseModule,
     CatalogClientModule,
-        StorageLocationModule,    
+      StorageLocationModule,
+    WarehouseLifecycleModule,
     /**
      * Módulo Logger de la aplicación
      */
